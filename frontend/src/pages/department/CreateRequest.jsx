@@ -11,6 +11,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { formatMoney } from '@/mock/format'
 import { apiFetch } from '@/lib/api'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog'
 
 function emptyItem() {
     return { name: '', quantity: 1, unit: '', unitPrice: 0 }
@@ -39,6 +40,30 @@ export default function CreateRequest() {
         return hasValidItem
     }, [purpose, items])
 
+    async function submitRequest() {
+        if (!canSubmit || submitting) return
+
+        try {
+            setSubmitting(true)
+            setError(null)
+            await apiFetch('/api/purchase-requests', {
+                method: 'POST',
+                body: {
+                    purpose: purpose.trim(),
+                    urgency,
+                    items,
+                },
+            })
+            navigate('/department/requests')
+            return true
+        } catch (err) {
+            setError(err?.message || 'Failed to submit request')
+            throw err
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -51,28 +76,7 @@ export default function CreateRequest() {
             <CardContent>
                 <form
                     className="grid gap-6"
-                    onSubmit={async (e) => {
-                        e.preventDefault()
-                        if (!canSubmit || submitting) return
-
-                        try {
-                            setSubmitting(true)
-                            setError(null)
-                            await apiFetch('/api/purchase-requests', {
-                                method: 'POST',
-                                body: {
-                                    purpose: purpose.trim(),
-                                    urgency,
-                                    items,
-                                },
-                            })
-                            navigate('/department/requests')
-                        } catch (err) {
-                            setError(err?.message || 'Failed to submit request')
-                        } finally {
-                            setSubmitting(false)
-                        }
-                    }}
+                    onSubmit={(e) => e.preventDefault()}
                 >
                     {error ? <div className="text-sm text-destructive">{error}</div> : null}
                     <div className="grid gap-2">
@@ -209,9 +213,17 @@ export default function CreateRequest() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Button type="submit" disabled={!canSubmit || submitting}>
-                            {submitting ? 'Submitting…' : 'Submit Request'}
-                        </Button>
+                        <ConfirmActionDialog
+                            title="Submit this purchase request?"
+                            description="This will send the request to Admin for review."
+                            confirmText="Submit"
+                            successMessage="Request submitted."
+                            onConfirm={submitRequest}
+                        >
+                            <Button type="button" disabled={!canSubmit || submitting}>
+                                {submitting ? 'Submitting…' : 'Submit Request'}
+                            </Button>
+                        </ConfirmActionDialog>
                         <Button type="button" variant="outline" onClick={() => navigate('/department/requests')}>
                             Cancel
                         </Button>

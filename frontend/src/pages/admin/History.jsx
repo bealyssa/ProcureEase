@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { formatDate, formatMoney } from '@/mock/format'
 import { apiFetch } from '@/lib/api'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog'
 
 function statusVariant(status) {
     if (status === 'Approved') return 'default'
@@ -25,7 +26,6 @@ export default function History() {
     const [userPassword, setUserPassword] = useState('')
     const [userDeptId, setUserDeptId] = useState('')
     const [userError, setUserError] = useState('')
-    const [userSuccess, setUserSuccess] = useState('')
     const [userLoading, setUserLoading] = useState(false)
 
     const [requests, setRequests] = useState([])
@@ -76,6 +76,7 @@ export default function History() {
             await loadRecords()
         } catch (e) {
             setDataError(e?.message || 'Failed to archive request')
+            throw e
         }
     }
 
@@ -89,6 +90,7 @@ export default function History() {
             await loadRecords()
         } catch (e) {
             setDataError(e?.message || 'Failed to delete request')
+            throw e
         }
     }
 
@@ -102,6 +104,7 @@ export default function History() {
             await loadRecords()
         } catch (e) {
             setDataError(e?.message || 'Failed to archive purchase order')
+            throw e
         }
     }
 
@@ -115,6 +118,7 @@ export default function History() {
             await loadRecords()
         } catch (e) {
             setDataError(e?.message || 'Failed to delete purchase order')
+            throw e
         }
     }
 
@@ -146,15 +150,16 @@ export default function History() {
 
             setDeptName('')
             await loadDepartments()
+            return true
         } catch (err) {
             setDeptError(err?.message || 'Failed to create department')
             setDeptLoading(false)
+            throw err
         }
     }
 
     async function createUser() {
         setUserError('')
-        setUserSuccess('')
         setUserLoading(true)
 
         try {
@@ -171,12 +176,14 @@ export default function History() {
                 body: payload,
             })
 
-            setUserSuccess(`Created user: ${data.user?.email || userEmail}`)
             setUserName('')
             setUserEmail('')
             setUserPassword('')
+
+            return data
         } catch (err) {
             setUserError(err?.message || 'Failed to create user')
+            throw err
         } finally {
             setUserLoading(false)
         }
@@ -218,9 +225,17 @@ export default function History() {
 
                                     <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
                                         <Input value={deptName} onChange={(e) => setDeptName(e.target.value)} placeholder="New department name" disabled={deptLoading} />
-                                        <Button type="button" onClick={createDepartment} disabled={deptLoading || !deptName.trim()}>
-                                            Create Department
-                                        </Button>
+                                        <ConfirmActionDialog
+                                            title="Create this department?"
+                                            description="This will add a new department to the system."
+                                            confirmText="Create"
+                                            successMessage="Department created."
+                                            onConfirm={createDepartment}
+                                        >
+                                            <Button type="button" disabled={deptLoading || !deptName.trim()}>
+                                                Create Department
+                                            </Button>
+                                        </ConfirmActionDialog>
                                         <div className="text-sm text-muted-foreground md:text-right">
                                             Total: {deptRows.length}
                                         </div>
@@ -282,27 +297,27 @@ export default function History() {
                                         </div>
                                     ) : null}
 
-                                    {userSuccess ? (
-                                        <div className="rounded-md border p-3 text-sm">
-                                            <div className="font-medium">Success</div>
-                                            <div className="text-muted-foreground">{userSuccess}</div>
-                                        </div>
-                                    ) : null}
-
                                     <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            type="button"
-                                            onClick={createUser}
-                                            disabled={
-                                                userLoading ||
-                                                !userName.trim() ||
-                                                !userEmail.trim() ||
-                                                !userPassword.trim() ||
-                                                !userDeptId
-                                            }
+                                        <ConfirmActionDialog
+                                            title="Create this user account?"
+                                            description="This will create a new user and allow them to sign in."
+                                            confirmText="Create"
+                                            successMessage={(data) => `User created: ${data?.user?.email || userEmail.trim()}`}
+                                            onConfirm={createUser}
                                         >
-                                            {userLoading ? 'Creating…' : 'Create User'}
-                                        </Button>
+                                            <Button
+                                                type="button"
+                                                disabled={
+                                                    userLoading ||
+                                                    !userName.trim() ||
+                                                    !userEmail.trim() ||
+                                                    !userPassword.trim() ||
+                                                    !userDeptId
+                                                }
+                                            >
+                                                {userLoading ? 'Creating…' : 'Create User'}
+                                            </Button>
+                                        </ConfirmActionDialog>
                                         <Button type="button" variant="outline" onClick={loadDepartments} disabled={deptLoading}>
                                             Load Departments
                                         </Button>
@@ -352,23 +367,29 @@ export default function History() {
                                                         <Button asChild size="sm" variant="outline">
                                                             <Link to={`/admin/requests/${r.id}`}>View</Link>
                                                         </Button>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="secondary"
-                                                            onClick={() => onArchiveRequest(r.id)}
-                                                            disabled={r.archived}
+                                                        <ConfirmActionDialog
+                                                            title="Archive this request?"
+                                                            description="This request will be marked as archived."
+                                                            confirmText="Archive"
+                                                            successMessage="Request archived."
+                                                            onConfirm={() => onArchiveRequest(r.id)}
                                                         >
-                                                            Archive
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            onClick={() => onDeleteRequest(r.id)}
+                                                            <Button type="button" size="sm" variant="secondary" disabled={r.archived}>
+                                                                Archive
+                                                            </Button>
+                                                        </ConfirmActionDialog>
+                                                        <ConfirmActionDialog
+                                                            title="Delete this request?"
+                                                            description="This will mark the request as deleted."
+                                                            confirmText="Delete"
+                                                            confirmVariant="destructive"
+                                                            successMessage="Request deleted."
+                                                            onConfirm={() => onDeleteRequest(r.id)}
                                                         >
-                                                            Delete
-                                                        </Button>
+                                                            <Button type="button" size="sm" variant="destructive">
+                                                                Delete
+                                                            </Button>
+                                                        </ConfirmActionDialog>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -415,23 +436,29 @@ export default function History() {
                                                         <Button asChild size="sm" variant="outline">
                                                             <Link to={`/admin/requests/${po.prId}`}>View Request</Link>
                                                         </Button>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="secondary"
-                                                            onClick={() => onArchivePo(po.id)}
-                                                            disabled={po.archived}
+                                                        <ConfirmActionDialog
+                                                            title="Archive this purchase order?"
+                                                            description="This purchase order will be marked as archived."
+                                                            confirmText="Archive"
+                                                            successMessage="Purchase order archived."
+                                                            onConfirm={() => onArchivePo(po.id)}
                                                         >
-                                                            Archive
-                                                        </Button>
-                                                        <Button
-                                                            type="button"
-                                                            size="sm"
-                                                            variant="destructive"
-                                                            onClick={() => onDeletePo(po.id)}
+                                                            <Button type="button" size="sm" variant="secondary" disabled={po.archived}>
+                                                                Archive
+                                                            </Button>
+                                                        </ConfirmActionDialog>
+                                                        <ConfirmActionDialog
+                                                            title="Delete this purchase order?"
+                                                            description="This will mark the purchase order as deleted."
+                                                            confirmText="Delete"
+                                                            confirmVariant="destructive"
+                                                            successMessage="Purchase order deleted."
+                                                            onConfirm={() => onDeletePo(po.id)}
                                                         >
-                                                            Delete
-                                                        </Button>
+                                                            <Button type="button" size="sm" variant="destructive">
+                                                                Delete
+                                                            </Button>
+                                                        </ConfirmActionDialog>
                                                     </div>
                                                 </td>
                                             </tr>

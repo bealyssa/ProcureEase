@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { formatMoney } from '@/mock/format'
 import { apiFetch } from '@/lib/api'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog'
 
 export default function CreatePurchaseOrder() {
     const { prId } = useParams()
@@ -107,13 +108,13 @@ export default function CreatePurchaseOrder() {
 
     const canCreate = request.status === 'Approved' && !request.archived
 
-    async function handleSubmit(e) {
-        e.preventDefault()
+    async function createPo() {
         setError('')
 
         if (!canCreate) {
-            setError('Request must be Approved (and not archived) to create a PO.')
-            return
+            const err = new Error('Request must be Approved (and not archived) to create a PO.')
+            setError(err.message)
+            throw err
         }
 
         if (submitting) return
@@ -131,8 +132,10 @@ export default function CreatePurchaseOrder() {
             })
 
             navigate('/admin/purchase-orders')
+            return true
         } catch (err) {
             setError(err?.message || 'Failed to create purchase order')
+            throw err
         } finally {
             setSubmitting(false)
         }
@@ -154,7 +157,7 @@ export default function CreatePurchaseOrder() {
                     </div>
                 ) : null}
 
-                <form className="grid gap-3" onSubmit={handleSubmit}>
+                <form className="grid gap-3" onSubmit={(e) => e.preventDefault()}>
                     <div className="grid gap-2">
                         <div className="text-sm font-medium">Supplier Name</div>
                         <Input value={supplierName} onChange={(e) => setSupplierName(e.target.value)} placeholder="Supplier" />
@@ -177,9 +180,17 @@ export default function CreatePurchaseOrder() {
                     </div>
 
                     <div className="flex flex-wrap gap-2 pt-1">
-                        <Button type="submit" disabled={submitting}>
-                            {submitting ? 'Creating…' : 'Create PO'}
-                        </Button>
+                        <ConfirmActionDialog
+                            title="Create this purchase order?"
+                            description="This will create a purchase order and link it to the approved request."
+                            confirmText="Create"
+                            successMessage="Purchase order created."
+                            onConfirm={createPo}
+                        >
+                            <Button type="button" disabled={submitting}>
+                                {submitting ? 'Creating…' : 'Create PO'}
+                            </Button>
+                        </ConfirmActionDialog>
                         <Button asChild type="button" variant="outline">
                             <Link to={`/admin/requests/${request.id}`}>Back to Request</Link>
                         </Button>

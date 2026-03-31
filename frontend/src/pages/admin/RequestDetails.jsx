@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea'
 import { formatDate, formatMoney } from '@/mock/format'
 import { apiFetch } from '@/lib/api'
+import ConfirmActionDialog from '@/components/ConfirmActionDialog'
 
 function statusVariant(status) {
     if (status === 'Approved') return 'default'
@@ -133,6 +134,7 @@ export default function AdminRequestDetails() {
             await load()
         } catch (e) {
             setActionError(e?.message || 'Failed to update request')
+            throw e
         } finally {
             setSubmitting(false)
         }
@@ -245,12 +247,30 @@ export default function AdminRequestDetails() {
                                 onChange={(e) => setRemarks(e.target.value)}
                             />
                             <div className="flex flex-wrap gap-2">
-                                <Button type="button" onClick={() => handleReview('Approved')} disabled={submitting}>
-                                    {submitting ? 'Saving…' : 'Approve'}
-                                </Button>
-                                <Button type="button" variant="destructive" onClick={() => handleReview('Rejected')} disabled={submitting}>
-                                    {submitting ? 'Saving…' : 'Reject'}
-                                </Button>
+                                <ConfirmActionDialog
+                                    title="Approve this request?"
+                                    description="This will mark the request as Approved."
+                                    confirmText="Approve"
+                                    successMessage="Request approved."
+                                    onConfirm={() => handleReview('Approved')}
+                                >
+                                    <Button type="button" disabled={submitting}>
+                                        {submitting ? 'Saving…' : 'Approve'}
+                                    </Button>
+                                </ConfirmActionDialog>
+
+                                <ConfirmActionDialog
+                                    title="Reject this request?"
+                                    description="This will mark the request as Rejected."
+                                    confirmText="Reject"
+                                    confirmVariant="destructive"
+                                    successMessage="Request rejected."
+                                    onConfirm={() => handleReview('Rejected')}
+                                >
+                                    <Button type="button" variant="destructive" disabled={submitting}>
+                                        {submitting ? 'Saving…' : 'Reject'}
+                                    </Button>
+                                </ConfirmActionDialog>
                             </div>
                         </div>
                     ) : null}
