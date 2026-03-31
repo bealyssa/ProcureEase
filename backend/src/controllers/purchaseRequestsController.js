@@ -1,5 +1,12 @@
 const { AppDataSource } = require('../config/dataSource')
 
+function safeErrorMessage(err, fallback) {
+    if (!err) return fallback
+    if (typeof err.detail === 'string' && err.detail.trim()) return err.detail
+    if (typeof err.message === 'string' && err.message.trim()) return err.message
+    return fallback
+}
+
 function mapPrStatusToUi(status) {
     if (status === 'Submitted') return 'Pending Approval'
     return status || 'Draft'
@@ -142,10 +149,17 @@ async function createPurchaseRequest(req, res) {
         }
 
         const userRepo = AppDataSource.getRepository('User')
-        const user = await userRepo.findOne({ where: { user_id: req.auth.userId } })
+        const user = await userRepo.findOne({
+            where: { user_id: req.auth.userId },
+            relations: { department: true },
+        })
         if (!user) return res.status(401).json({ message: 'Invalid user' })
+        if (!user.department) return res.status(400).json({ message: 'User has no department' })
 
         const categoryId = await ensureDefaultCategoryId()
+        const categoryRepo = AppDataSource.getRepository('ItemCategory')
+        const category = await categoryRepo.findOne({ where: { category_id: Number(categoryId) } })
+        if (!category) return res.status(400).json({ message: 'Item category not found' })
         const prNumber = await generatePrNumber()
 
         const prRepo = AppDataSource.getRepository('PurchaseRequest')
@@ -167,9 +181,9 @@ async function createPurchaseRequest(req, res) {
             admin_remarks: null,
             archived: false,
             deleted: false,
-            dept_id: user.dept_id,
-            requester_id: user.user_id,
-            category_id: categoryId,
+            department: user.department,
+            requester: user,
+            category,
         })
 
         const prItems = normalizedItems
@@ -178,7 +192,7 @@ async function createPurchaseRequest(req, res) {
                 const qty = Number(it.quantity || 0)
                 const unitPrice = Number(it.unitPrice || 0)
                 return {
-                    pr_id: pr.pr_id,
+                    purchaseRequest: pr,
                     item_name: String(it.name).trim(),
                     item_description: null,
                     quantity: qty,
@@ -201,14 +215,18 @@ async function createPurchaseRequest(req, res) {
             action_type: 'Created',
             old_value: null,
             new_value: `Created ${prNumber}`,
-            pr_id: pr.pr_id,
-            po_id: null,
-            user_id: user.user_id,
+            purchaseRequest: pr,
+            purchaseOrder: null,
+            user,
         })
 
         res.status(201).json(mapPrEntity(saved))
-    } catch {
-        res.status(500).json({ message: 'Failed to create purchase request' })
+    } catch (e) {
+        console.error('createPurchaseRequest failed', e)
+        const message = process.env.NODE_ENV === 'production'
+            ? 'Failed to create purchase request'
+            : safeErrorMessage(e, 'Failed to create purchase request')
+        res.status(500).json({ message })
     }
 }
 

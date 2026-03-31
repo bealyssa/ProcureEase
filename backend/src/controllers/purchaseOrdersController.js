@@ -16,10 +16,11 @@ function toNumberOrNull(value) {
 function mapPoEntity(po) {
     const pr = po?.purchaseRequest
     const requesterEmail = pr?.requester?.email || null
+    const prId = pr?.pr_id ?? po?.pr_id ?? null
 
     return {
         id: po.po_id,
-        prId: po.pr_id,
+        prId,
         poNumber: po.po_number,
         supplierName: po?.supplier?.supplier_name || 'Supplier',
         issueDate: po.issue_date,
